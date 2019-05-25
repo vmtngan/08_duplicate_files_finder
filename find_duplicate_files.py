@@ -52,7 +52,7 @@ def group_files_by_checksum(file_path_names):
     return group_files(file_path_names, get_file_checksum)
 
 
-def find_duplicate_files(file_path_names):
+def find_duplicate_files_by_hash(file_path_names):
     groups = []
     for group in group_files_by_size(file_path_names):
         groups += group_files_by_checksum(group)
@@ -60,41 +60,49 @@ def find_duplicate_files(file_path_names):
 
 
 def compare_two_files(path_1, path_2):
+    with open(path_1, 'rb') as file_1, open(path_2, 'rb') as file_2:
+        while True:
+            content_1 = file_1.read(BUF_SIZE)
+            content_2 = file_2.read(BUF_SIZE)
+            if content_1 != content_2:
+                return False
+            if not content_1:
+                return True
+
+
+def are_duplicate_files(path_1, path_2):
     try:
-        buf_size = BUF_SIZE
-        with open(path_1, 'rb') as file_1, open(path_2, 'rb') as file_2:
-            while True:
-                content_1 = file_1.read(buf_size)
-                content_2 = file_2.read(buf_size)
-                if content_1 != content_2:
-                    return False
-                if not content_1:
-                    return True
+        if getsize(path_1) == getsize(path_2) and getsize(path_1):
+            return compare_two_files(path_1, path_2)
+        return False
     except PermissionError:
         return False
 
 
-def are_duplicate_files(first_path, second_path):
-    if getsize(first_path) == getsize(second_path) and getsize(first_path):
-        return compare_two_files(first_path, second_path)
-    return False
-
-
-def find_duplicate_files_faster(file_path_names):
-    groups = {}
-    while file_path_names:
-        temp = file_path_names.pop(0)
-        if temp not in groups:
-            groups[temp] = [temp]
-        length = len(file_path_names)
-        index = 0
-        while index < length:
-            if are_duplicate_files(temp, file_path_names[index]):
-                groups[temp].append(file_path_names.pop(index))
-                length -= 1
-                continue
+def get_one_group(file_path_names):
+    group = [file_path_names.pop(0)]
+    index = 0
+    while index < len(file_path_names):
+        if not are_duplicate_files(group[0], file_path_names[index]):
             index += 1
-    return [group for group in groups.values() if len(group) > 1]
+            continue
+        group.append(file_path_names.pop(index))
+    return group, file_path_names
+
+
+def find_duplicate_files_by_compare(file_path_names):
+    groups = []
+    while file_path_names:
+        group, file_path_names = get_one_group(file_path_names)
+        if len(group) > 1:
+            groups.append(group)
+    return groups
+
+
+def find_duplicate_files(file_path_names, faster_mode=False):
+    if faster_mode:
+        return find_duplicate_files_by_compare(file_path_names)
+    return find_duplicate_files_by_hash(file_path_names)
 
 
 def print_output(output):
@@ -105,10 +113,7 @@ def print_output(output):
 def main():
     start = time()
     args = get_arguments()
-    if args.fast:
-        print_output(find_duplicate_files_faster(scan_files(args.path)))
-    else:
-        print_output(find_duplicate_files(scan_files(args.path)))
+    print_output(find_duplicate_files(scan_files(args.path), args.fast))
     print('\nRuntime: {}s'.format(round(time() - start, 5)))
 
 
