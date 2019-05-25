@@ -4,12 +4,15 @@ from os import walk
 from os.path import join, islink, getsize, abspath
 from hashlib import md5
 from json import dumps
+from time import time
 
 
 def get_arguments():
     parser = ArgumentParser(prog='Duplicate Files Finder')
     parser.add_argument('-p', '--path', help='specify the absolute path '
                                              'where to find duplicate files')
+    parser.add_argument('-f', '--fast', action='store_true',
+                        help='use another method to find duplicate files')
     return parser.parse_args()
 
 
@@ -60,9 +63,22 @@ def print_output(output):
         print(dumps(output, separators=(',\n', '')))
 
 
+def get_content(file_path):
+    try:
+        with open(file_path, 'rb') as file:
+            return file.read()
+    except (PermissionError, FileNotFoundError):
+        return None
+
+
 def main():
+    start = time()
     args = get_arguments()
-    print_output(find_duplicate_files(scan_files(args.path)))
+    if args.fast:
+        print_output(group_files(scan_files(args.path), get_content))
+    else:
+        print_output(find_duplicate_files(scan_files(args.path)))
+    print('\nRuntime: {}s'.format(round(time() - start, 5)))
 
 
 if __name__ == '__main__':
