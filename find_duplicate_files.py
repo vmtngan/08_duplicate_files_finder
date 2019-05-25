@@ -114,7 +114,7 @@ def main():
     start = time()
     args = get_arguments()
     print_output(find_duplicate_files(scan_files(args.path), args.fast))
-    print('\nRuntime: {}s'.format(round(time() - start, 5)))
+    print(f'\nRuntime: {round(time() - start, 5)}s')
 
 
 if __name__ == '__main__':
