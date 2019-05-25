@@ -5,6 +5,7 @@ from os.path import join, islink, getsize, abspath
 from hashlib import md5
 from json import dumps
 from time import time
+BUF_SIZE = 8 * 1024
 
 
 def get_arguments():
@@ -58,24 +59,54 @@ def find_duplicate_files(file_path_names):
     return groups
 
 
+def compare_two_files(path_1, path_2):
+    try:
+        buf_size = BUF_SIZE
+        with open(path_1, 'rb') as file_1, open(path_2, 'rb') as file_2:
+            while True:
+                content_1 = file_1.read(buf_size)
+                content_2 = file_2.read(buf_size)
+                if content_1 != content_2:
+                    return False
+                if not content_1:
+                    return True
+    except PermissionError:
+        return False
+
+
+def are_duplicate_files(first_path, second_path):
+    if getsize(first_path) == getsize(second_path) and getsize(first_path):
+        return compare_two_files(first_path, second_path)
+    return False
+
+
+def find_duplicate_files_faster(file_path_names):
+    groups = {}
+    while file_path_names:
+        temp = file_path_names.pop(0)
+        if temp not in groups:
+            groups[temp] = [temp]
+        length = len(file_path_names)
+        index = 0
+        while index < length:
+            if are_duplicate_files(temp, file_path_names[index]):
+                groups[temp].append(file_path_names.pop(index))
+                length -= 1
+                continue
+            index += 1
+    return [group for group in groups.values() if len(group) > 1]
+
+
 def print_output(output):
     if output:
         print(dumps(output, separators=(',\n', '')))
-
-
-def get_content(file_path):
-    try:
-        with open(file_path, 'rb') as file:
-            return file.read()
-    except (PermissionError, FileNotFoundError):
-        return None
 
 
 def main():
     start = time()
     args = get_arguments()
     if args.fast:
-        print_output(group_files(scan_files(args.path), get_content))
+        print_output(find_duplicate_files_faster(scan_files(args.path)))
     else:
         print_output(find_duplicate_files(scan_files(args.path)))
     print('\nRuntime: {}s'.format(round(time() - start, 5)))
